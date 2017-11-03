@@ -159,6 +159,7 @@ void *log_task(){
         		sprintf(data, "Time : %ld secs, %ld usecs | Source : Temperature task | Request Light\n",\
         				rmsg_temp.time_stamp.tv_sec, rmsg_temp.time_stamp.tv_usec);
         		fwrite(data, sizeof(char), strlen(data), file);
+
         	}
         	if(rmsg_temp.log_type == RESPONSE){
         		sprintf(data, "Time : %ld secs, %ld usecs | Source : Temperature task | Data : %f | Response to Light task \n",\
@@ -184,6 +185,8 @@ void *log_task(){
         		sprintf(data, "Time : %ld secs, %ld usecs | Source : Light task       | Request Temperature\n",\
         				rmsg_light.time_stamp.tv_sec, rmsg_light.time_stamp.tv_usec);
         		fwrite(data, sizeof(char), strlen(data), file);
+                if( mq_send(log_to_temp, (const char*)&rmsg_light, sizeof(rmsg_light), 1) == -1)
+                	printf("\nUnable to send");
         	}
         	if(rmsg_light.log_type == RESPONSE){
         		sprintf(data, "Time : %ld secs, %ld usecs | Source : Light task       | Data : %f | Response to temp task \n",\
@@ -228,12 +231,6 @@ void *temp_task(){
         if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
         	printf("\nUnable to send");
 
-        status = mq_receive(log_to_temp, (char*)&rmsg, \
-                            sizeof(rmsg), NULL);
-
-        if (status > 0) {
-            printf("MSG in temp_thread: %f\n", rmsg.data);
-        }
         counter_temp++;
     	}
 
@@ -248,12 +245,6 @@ void *temp_task(){
         if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
         	printf("\nUnable to send");
 
-        status = mq_receive(log_to_temp, (char*)&rmsg, \
-                            sizeof(rmsg), NULL);
-
-        if (status > 0) {
-            printf("MSG in temp_thread: %f\n", rmsg.data);
-        }
         counter_temp++;
     	}
 
@@ -268,14 +259,21 @@ void *temp_task(){
         if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
         	printf("\nUnable to send");
 
-        status = mq_receive(log_to_temp, (char*)&rmsg, \
-                            sizeof(rmsg), NULL);
-
-        if (status > 0) {
-            printf("MSG in temp_thread: %f\n", rmsg.data);
-        }
         counter_temp = 0;
     	}
+
+        if( mq_receive(log_to_temp, (char*)&rmsg, sizeof(rmsg), NULL) != -1)
+        	{
+        	gettimeofday(&smsg.time_stamp, NULL);
+        	smsg.log_level = STARTUP;
+        	smsg.src_id = LIGHT_TASK;
+        	smsg.dest_id = LOG_TASK;
+        	smsg.log_type = RESPONSE;
+        	smsg.data = 10000;
+
+            if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+            	printf("\nUnable to send");
+        	}
 
         usleep(exec_period_usecs);
     }
@@ -311,12 +309,6 @@ void *light_task(){
         if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
         	printf("\nUnable to send");
 
-        status = mq_receive(log_to_light, (char*)&rmsg, \
-                            sizeof(rmsg), NULL);
-
-        if (status > 0) {
-            printf("MSG in light_thread: %f\n", rmsg.data);
-        }
         counter_light++;
     	}
 
@@ -331,12 +323,6 @@ void *light_task(){
         if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
         	printf("\nUnable to send");
 
-        status = mq_receive(log_to_light, (char*)&rmsg, \
-                            sizeof(rmsg), NULL);
-
-        if (status > 0) {
-            printf("MSG in light_thread: %f\n", rmsg.data);
-        }
         counter_light++;
     	}
 
@@ -351,14 +337,21 @@ void *light_task(){
         if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
         	printf("\nUnable to send");
 
-        status = mq_receive(log_to_light, (char*)&rmsg, \
-                            sizeof(rmsg), NULL);
-
-        if (status > 0) {
-            printf("MSG in light_thread: %f\n", rmsg.data);
-        }
         counter_light = 0;
     	}
+
+        if( mq_receive(log_to_light, (char*)&rmsg, sizeof(rmsg), NULL) != -1)
+        	{
+        	gettimeofday(&smsg.time_stamp, NULL);
+        	smsg.log_level = STARTUP;
+        	smsg.src_id = LIGHT_TASK;
+        	smsg.dest_id = LOG_TASK;
+        	smsg.log_type = RESPONSE;
+        	smsg.data = 10000;
+
+            if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+            	printf("\nUnable to send");
+        	}
 
         usleep(exec_period_usecs);
     }
