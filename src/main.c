@@ -44,7 +44,8 @@ typedef struct {
 	float data;
 }message_t;
 
-#define	TO_LOG			"/to_log"
+#define	TEMP_TO_LOG		"/temptolog"
+#define	LIGHT_TO_LOG	"/lighttolog"
 #define LOG_TO_LIGHT	"/logtolight"
 #define	LOG_TO_TEMP		"/logtotemp"
 #define	LOG_TO_MAIN		"/logtomain"
@@ -54,7 +55,7 @@ pthread_t log_thread, temp_thread, light_thread;
 
 static unsigned int counter;
 
-mqd_t to_log, log_to_light, log_to_temp, log_to_main;
+mqd_t temp_to_log, light_to_log, log_to_light, log_to_temp, log_to_main;
 
 char data[500];
 
@@ -67,8 +68,10 @@ static void sig_handler(int signal){
 		pthread_cancel(log_thread);
 		pthread_cancel(temp_thread);
 		pthread_cancel(light_thread);
-		mq_close(to_log);
-		mq_unlink(TO_LOG);
+		mq_close(TEMP_TO_LOG);
+		mq_unlink(TEMP_TO_LOG);
+		mq_close(LIGHT_TO_LOG);
+		mq_unlink(LIGHT_TO_LOG);
 		break;
 	}
 }
@@ -90,7 +93,7 @@ void *log_task(){
 
     unsigned int exec_period_usecs;
     int status;
-    message_t msg;
+    message_t msg1, msg2;
 
     exec_period_usecs = 10000; /*in micro-seconds*/
 
@@ -98,11 +101,19 @@ void *log_task(){
                                            exec_period_usecs);
 
     while(1) {
-        status = mq_receive(to_log, (char*)&msg, \
-                            sizeof(msg), NULL);
+        status = mq_receive(temp_to_log, (char*)&msg1, \
+                            sizeof(msg1), NULL);
 
         if (status > 0) {
-            printf("RECVd MSG in THRD_2: %f\n", msg.data);
+            printf("RECVd MSG in THRD_2: %f\n", msg1.data);
+            counter += 1;
+        }
+
+        status = mq_receive(light_to_log, (char*)&msg2, \
+                            sizeof(msg2), NULL);
+
+        if (status > 0) {
+            printf("RECVd MSG in THRD_2: %f\n", msg2.data);
             counter += 1;
         }
 
@@ -128,10 +139,10 @@ void *temp_task(){
 	init_msg.src_id = TEMP_TASK;
 	init_msg.dest_id = LOG_TASK;
 	init_msg.log_type = INIT;
-	init_msg.data = 12.22;
+	init_msg.data = 11.111;
 
     while(1) {
-        if( mq_send(to_log, (const char*)&init_msg, sizeof(init_msg), 1) == -1)
+        if( mq_send(temp_to_log, (const char*)&init_msg, sizeof(init_msg), 1) == -1)
         	printf("\nUnable to send");
        // ASSERT(status != -1);
         usleep(exec_period_usecs);
@@ -140,8 +151,31 @@ void *temp_task(){
 }
 
 void *light_task(){
-	printf("In light task \n");
-	pthread_exit(NULL);
+
+	printf("In LIGHT task \n");
+
+    unsigned int exec_period_usecs;
+    int status;
+
+    exec_period_usecs = 1000000; /*in micro-seconds*/
+
+    printf("Thread 1 started. Execution period = %d uSecs\n",\
+                                           exec_period_usecs);
+	static message_t init_msg;
+	gettimeofday(&init_msg.time_stamp, NULL);
+	init_msg.log_level = STARTUP;
+	init_msg.src_id = LIGHT_TASK;
+	init_msg.dest_id = LOG_TASK;
+	init_msg.log_type = INIT;
+	init_msg.data = 2.2222;
+
+    while(1) {
+        if( mq_send(light_to_log, (const char*)&init_msg, sizeof(init_msg), 1) == -1)
+        	printf("\nUnable to send");
+       // ASSERT(status != -1);
+        usleep(exec_period_usecs);
+    }
+
 }
 
 int main(int argc, char *argv[])
@@ -150,12 +184,15 @@ int main(int argc, char *argv[])
 
 	message_t msg;
 
-	mq_close(TO_LOG);
-	mq_unlink(TO_LOG);
+	mq_close(TEMP_TO_LOG);
+	mq_unlink(TEMP_TO_LOG);
+	mq_close(LIGHT_TO_LOG);
+	mq_unlink(LIGHT_TO_LOG);
 	attr.mq_maxmsg = 10;
 	attr.mq_msgsize = sizeof(msg);
 	attr.mq_flags = 0;
-	to_log = mq_open (TO_LOG, O_CREAT|O_RDWR|O_NONBLOCK, 0666, &attr);
+	temp_to_log = mq_open (TEMP_TO_LOG, O_CREAT|O_RDWR|O_NONBLOCK, 0666, &attr);
+	light_to_log = mq_open (LIGHT_TO_LOG, O_CREAT|O_RDWR|O_NONBLOCK, 0666, &attr);
 
 	struct sigaction sig;
 	sig.sa_flags = SA_SIGINFO;
