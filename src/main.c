@@ -32,6 +32,7 @@ typedef enum{
 	FAILURE,
 	DATA,
 	REQUEST,
+	RESPONSE,
 	HEART_BEAT
 }log_type_t;
 
@@ -61,6 +62,8 @@ char data[500];
 
 int exec_period_usecs = 1000000; /*in micro-seconds*/
 int caught_signal = 0;
+int counter_temp = 0;
+int counter_light = 0;
 int counter = 0;
 
 struct	mq_attr	attr;
@@ -103,7 +106,6 @@ void *log_task(){
 
 	file = fopen(file_name, "a+");
 
-    int status;
     message_t rmsg_light, rmsg_temp;
 
 	static message_t smsg_light, smsg_temp, smsg_main;
@@ -141,19 +143,55 @@ void *log_task(){
         if( mq_send(log_to_main, (const char*)&smsg_main, sizeof(smsg_main), 1) == -1)
         	printf("\nUnable to send");
 
-        status = mq_receive(temp_to_log, (char*)&rmsg_temp, \
-                            sizeof(rmsg_temp), NULL);
-
-        if (status > 0) {
-            printf("MSG in 1 LOG_THREAD: %f\n", rmsg_temp.data);
+        if(mq_receive(temp_to_log, (char*)&rmsg_temp, \
+                            sizeof(rmsg_temp), NULL)>0){
+        	if(rmsg_temp.log_type == DATA){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Temperature task | Data : %f\n",\
+        				rmsg_temp.time_stamp.tv_sec, rmsg_temp.time_stamp.tv_usec, rmsg_temp.data);
+        		fwrite(data, sizeof(char), strlen(data), file);
+        	}
+        	if(rmsg_temp.log_type == INIT){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Temperature task | Task Initialized\n",\
+        				rmsg_temp.time_stamp.tv_sec, rmsg_temp.time_stamp.tv_usec);
+        		fwrite(data, sizeof(char), strlen(data), file);
+        	}
+        	if(rmsg_temp.log_type == REQUEST){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Temperature task | Request Light\n",\
+        				rmsg_temp.time_stamp.tv_sec, rmsg_temp.time_stamp.tv_usec);
+        		fwrite(data, sizeof(char), strlen(data), file);
+        	}
+        	if(rmsg_temp.log_type == RESPONSE){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Temperature task | Data : %f | Response to Light task \n",\
+        				rmsg_temp.time_stamp.tv_sec, rmsg_temp.time_stamp.tv_usec, rmsg_temp.data);
+        		fwrite(data, sizeof(char), strlen(data), file);
+        	}
         }
 
-        status = mq_receive(light_to_log, (char*)&rmsg_light, \
-                            sizeof(rmsg_light), NULL);
 
-        if (status > 0) {
-            printf("MSG in 2 LOG_THREAD: %f\n", rmsg_light.data);
+        if( mq_receive(light_to_log, (char*)&rmsg_light, \
+                            sizeof(rmsg_light), NULL) > 0){
+        	if(rmsg_light.log_type == DATA){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Light task 	 | Data : %f\n",\
+        				rmsg_light.time_stamp.tv_sec, rmsg_light.time_stamp.tv_usec, rmsg_light.data);
+        		fwrite(data, sizeof(char), strlen(data), file);
+        	}
+        	if(rmsg_light.log_type == INIT){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Light task       | Task Initialized\n",\
+        				rmsg_light.time_stamp.tv_sec, rmsg_light.time_stamp.tv_usec);
+        		fwrite(data, sizeof(char), strlen(data), file);
+        	}
+        	if(rmsg_light.log_type == REQUEST){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Light task       | Request Temperature\n",\
+        				rmsg_light.time_stamp.tv_sec, rmsg_light.time_stamp.tv_usec);
+        		fwrite(data, sizeof(char), strlen(data), file);
+        	}
+        	if(rmsg_light.log_type == RESPONSE){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Light task       | Data : %f | Response to temp task \n",\
+        				rmsg_light.time_stamp.tv_sec, rmsg_light.time_stamp.tv_usec, rmsg_light.data);
+        		fwrite(data, sizeof(char), strlen(data), file);
+        	}
         }
+
 
         counter++;
         usleep(exec_period_usecs);
@@ -166,13 +204,25 @@ void *temp_task(){
 	printf("In Temp task \n");
 	static message_t smsg, rmsg;
 
+	gettimeofday(&smsg.time_stamp, NULL);
+	smsg.log_level = STARTUP;
+	smsg.src_id = TEMP_TASK;
+	smsg.dest_id = LOG_TASK;
+	smsg.log_type = INIT;
+	smsg.data = 0;
+
+    if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    	printf("\nUnable to send");
+
+
     while(1) {
 
+    	if(counter_temp == 0){
     	gettimeofday(&smsg.time_stamp, NULL);
     	smsg.log_level = STARTUP;
     	smsg.src_id = TEMP_TASK;
     	smsg.dest_id = LOG_TASK;
-    	smsg.log_type = INIT;
+    	smsg.log_type = DATA;
     	smsg.data = counter;
 
         if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
@@ -184,6 +234,48 @@ void *temp_task(){
         if (status > 0) {
             printf("MSG in temp_thread: %f\n", rmsg.data);
         }
+        counter_temp++;
+    	}
+
+    	else if(counter_temp == 1){
+    	gettimeofday(&smsg.time_stamp, NULL);
+    	smsg.log_level = STARTUP;
+    	smsg.src_id = TEMP_TASK;
+    	smsg.dest_id = LOG_TASK;
+    	smsg.log_type = REQUEST;
+    	smsg.data = counter;
+
+        if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+        	printf("\nUnable to send");
+
+        status = mq_receive(log_to_temp, (char*)&rmsg, \
+                            sizeof(rmsg), NULL);
+
+        if (status > 0) {
+            printf("MSG in temp_thread: %f\n", rmsg.data);
+        }
+        counter_temp++;
+    	}
+
+    	else if(counter_temp == 2){
+    	gettimeofday(&smsg.time_stamp, NULL);
+    	smsg.log_level = STARTUP;
+    	smsg.src_id = TEMP_TASK;
+    	smsg.dest_id = LOG_TASK;
+    	smsg.log_type = RESPONSE;
+    	smsg.data = counter;
+
+        if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+        	printf("\nUnable to send");
+
+        status = mq_receive(log_to_temp, (char*)&rmsg, \
+                            sizeof(rmsg), NULL);
+
+        if (status > 0) {
+            printf("MSG in temp_thread: %f\n", rmsg.data);
+        }
+        counter_temp = 0;
+    	}
 
         usleep(exec_period_usecs);
     }
@@ -195,18 +287,29 @@ void *light_task(){
 	printf("In LIGHT task \n");
 	static message_t smsg, rmsg;
 
+	gettimeofday(&smsg.time_stamp, NULL);
+	smsg.log_level = STARTUP;
+	smsg.src_id = LIGHT_TASK;
+	smsg.dest_id = LOG_TASK;
+	smsg.log_type = INIT;
+	smsg.data = counter;
+
+    if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    	printf("\nUnable to send");
+
+
     while(1) {
 
+    	if(counter_light == 0){
     	gettimeofday(&smsg.time_stamp, NULL);
     	smsg.log_level = STARTUP;
     	smsg.src_id = LIGHT_TASK;
     	smsg.dest_id = LOG_TASK;
-    	smsg.log_type = INIT;
+    	smsg.log_type = DATA;
     	smsg.data = counter;
 
         if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
         	printf("\nUnable to send");
-       // ASSERT(status != -1);
 
         status = mq_receive(log_to_light, (char*)&rmsg, \
                             sizeof(rmsg), NULL);
@@ -214,6 +317,49 @@ void *light_task(){
         if (status > 0) {
             printf("MSG in light_thread: %f\n", rmsg.data);
         }
+        counter_light++;
+    	}
+
+    	else if(counter_light == 1){
+    	gettimeofday(&smsg.time_stamp, NULL);
+    	smsg.log_level = STARTUP;
+    	smsg.src_id = LIGHT_TASK;
+    	smsg.dest_id = LOG_TASK;
+    	smsg.log_type = REQUEST;
+    	smsg.data = counter;
+
+        if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+        	printf("\nUnable to send");
+
+        status = mq_receive(log_to_light, (char*)&rmsg, \
+                            sizeof(rmsg), NULL);
+
+        if (status > 0) {
+            printf("MSG in light_thread: %f\n", rmsg.data);
+        }
+        counter_light++;
+    	}
+
+    	else if(counter_light == 2){
+    	gettimeofday(&smsg.time_stamp, NULL);
+    	smsg.log_level = STARTUP;
+    	smsg.src_id = LIGHT_TASK;
+    	smsg.dest_id = LOG_TASK;
+    	smsg.log_type = RESPONSE;
+    	smsg.data = counter;
+
+        if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+        	printf("\nUnable to send");
+
+        status = mq_receive(log_to_light, (char*)&rmsg, \
+                            sizeof(rmsg), NULL);
+
+        if (status > 0) {
+            printf("MSG in light_thread: %f\n", rmsg.data);
+        }
+        counter_light = 0;
+    	}
+
         usleep(exec_period_usecs);
     }
 
