@@ -61,6 +61,7 @@ char data[500];
 
 int exec_period_usecs = 1000000; /*in micro-seconds*/
 int caught_signal = 0;
+int counter = 0;
 
 struct	mq_attr	attr;
 
@@ -106,28 +107,30 @@ void *log_task(){
     message_t rmsg_light, rmsg_temp;
 
 	static message_t smsg_light, smsg_temp, smsg_main;
-	gettimeofday(&smsg_light.time_stamp, NULL);
-	smsg_light.log_level = STARTUP;
-	smsg_light.src_id = TEMP_TASK;
-	smsg_light.dest_id = LOG_TASK;
-	smsg_light.log_type = INIT;
-	smsg_light.data = 1.1111;
 
-	gettimeofday(&smsg_temp.time_stamp, NULL);
-	smsg_temp.log_level = STARTUP;
-	smsg_temp.src_id = TEMP_TASK;
-	smsg_temp.dest_id = LOG_TASK;
-	smsg_temp.log_type = INIT;
-	smsg_temp.data = 1.111;
-
-	gettimeofday(&smsg_main.time_stamp, NULL);
-	smsg_main.log_level = STARTUP;
-	smsg_main.src_id = TEMP_TASK;
-	smsg_main.dest_id = LOG_TASK;
-	smsg_main.log_type = INIT;
-	smsg_main.data = 1.111;
 
     while(1) {
+
+    	gettimeofday(&smsg_light.time_stamp, NULL);
+    	smsg_light.log_level = STARTUP;
+    	smsg_light.src_id = LOG_TASK;
+    	smsg_light.dest_id = LIGHT_TASK;
+    	smsg_light.log_type = INIT;
+    	smsg_light.data = counter;
+
+    	gettimeofday(&smsg_temp.time_stamp, NULL);
+    	smsg_temp.log_level = STARTUP;
+    	smsg_temp.src_id = LOG_TASK;
+    	smsg_temp.dest_id = TEMP_TASK;
+    	smsg_temp.log_type = INIT;
+    	smsg_temp.data = counter;
+
+    	gettimeofday(&smsg_main.time_stamp, NULL);
+    	smsg_main.log_level = STARTUP;
+    	smsg_main.src_id = LOG_TASK;
+    	smsg_main.dest_id = MAIN_TASK;
+    	smsg_main.log_type = INIT;
+    	smsg_main.data = counter;
 
         if( mq_send(log_to_light, (const char*)&smsg_light, sizeof(smsg_light), 1) == -1)
         	printf("\nUnable to send");
@@ -142,18 +145,17 @@ void *log_task(){
                             sizeof(rmsg_temp), NULL);
 
         if (status > 0) {
-            printf("RECVd MSG in 1 LOG_THREAD: %f\n", rmsg_temp.data);
+            printf("MSG in 1 LOG_THREAD: %f\n", rmsg_temp.data);
         }
 
         status = mq_receive(light_to_log, (char*)&rmsg_light, \
                             sizeof(rmsg_light), NULL);
 
         if (status > 0) {
-            printf("RECVd MSG in 2 LOG_THREAD: %f\n", rmsg_light.data);
+            printf("MSG in 2 LOG_THREAD: %f\n", rmsg_light.data);
         }
 
-
-
+        counter++;
         usleep(exec_period_usecs);
     }
 
@@ -163,14 +165,16 @@ void *log_task(){
 void *temp_task(){
 	printf("In Temp task \n");
 	static message_t smsg, rmsg;
-	gettimeofday(&smsg.time_stamp, NULL);
-	smsg.log_level = STARTUP;
-	smsg.src_id = TEMP_TASK;
-	smsg.dest_id = LOG_TASK;
-	smsg.log_type = INIT;
-	smsg.data = 3.33;
 
     while(1) {
+
+    	gettimeofday(&smsg.time_stamp, NULL);
+    	smsg.log_level = STARTUP;
+    	smsg.src_id = TEMP_TASK;
+    	smsg.dest_id = LOG_TASK;
+    	smsg.log_type = INIT;
+    	smsg.data = counter;
+
         if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
         	printf("\nUnable to send");
 
@@ -178,7 +182,7 @@ void *temp_task(){
                             sizeof(rmsg), NULL);
 
         if (status > 0) {
-            printf("RECVd MSG in temp_thread: %f\n", rmsg.data);
+            printf("MSG in temp_thread: %f\n", rmsg.data);
         }
 
         usleep(exec_period_usecs);
@@ -190,14 +194,16 @@ void *light_task(){
 
 	printf("In LIGHT task \n");
 	static message_t smsg, rmsg;
-	gettimeofday(&smsg.time_stamp, NULL);
-	smsg.log_level = STARTUP;
-	smsg.src_id = LIGHT_TASK;
-	smsg.dest_id = LOG_TASK;
-	smsg.log_type = INIT;
-	smsg.data = 2.2222;
 
     while(1) {
+
+    	gettimeofday(&smsg.time_stamp, NULL);
+    	smsg.log_level = STARTUP;
+    	smsg.src_id = LIGHT_TASK;
+    	smsg.dest_id = LOG_TASK;
+    	smsg.log_type = INIT;
+    	smsg.data = counter;
+
         if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
         	printf("\nUnable to send");
        // ASSERT(status != -1);
@@ -206,7 +212,7 @@ void *light_task(){
                             sizeof(rmsg), NULL);
 
         if (status > 0) {
-            printf("RECVd MSG in light_thread: %f\n", rmsg.data);
+            printf("MSG in light_thread: %f\n", rmsg.data);
         }
         usleep(exec_period_usecs);
     }
@@ -262,7 +268,7 @@ int main(int argc, char *argv[])
                             sizeof(rmsg), NULL);
 
         if (status > 0) {
-            printf("RECVd MSG in main_thread: %f\n", rmsg.data);
+            printf("MSG in main_thread: %f\n", rmsg.data);
         }
         usleep(exec_period_usecs);
     }
