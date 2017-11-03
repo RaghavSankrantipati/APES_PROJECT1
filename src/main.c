@@ -9,64 +9,9 @@
 #include<sys/stat.h>
 #include<fcntl.h>
 #include<sys/time.h>
+#include"../include/message.h"
+#include"../include/usrled.h"
 
-FILE *file;
-char file_name[50];
-
-typedef enum{
-	STARTUP,
-	INFO,
-	ALERT,
-	CRITICAL
-}log_level_t;
-
-typedef enum{
-	LOG_TASK,
-	LIGHT_TASK,
-	TEMP_TASK,
-	MAIN_TASK
-}source_t;
-
-typedef enum{
-	INIT,
-	FAILURE,
-	DATA,
-	REQUEST,
-	RESPONSE,
-	HEART_BEAT
-}log_type_t;
-
-typedef struct {
-	struct timeval time_stamp;
-	log_level_t log_level;
-	source_t src_id;
-	source_t dest_id;
-	log_type_t log_type;
-	float data;
-}message_t;
-
-#define	TEMP_TO_LOG		"/temptolog"
-#define	LIGHT_TO_LOG	"/lighttolog"
-#define LOG_TO_LIGHT	"/logtolight"
-#define	LOG_TO_TEMP		"/logtotemp"
-#define	LOG_TO_MAIN		"/logtomain"
-
-
-pthread_t log_thread, temp_thread, light_thread;
-
-mqd_t temp_to_log, light_to_log, log_to_light, log_to_temp, log_to_main;
-
-int status = 0;
-
-char data[500];
-
-int exec_period_usecs = 1000000; /*in micro-seconds*/
-int caught_signal = 0;
-int counter_temp = 0;
-int counter_light = 0;
-int counter = 0;
-
-struct	mq_attr	attr;
 
 static void sig_handler(int signal){
 	switch(signal){
@@ -85,6 +30,8 @@ static void sig_handler(int signal){
 		mq_unlink(LOG_TO_TEMP);
 		mq_close(log_to_main);
 		mq_unlink(LOG_TO_MAIN);
+    	led2_off();
+    	led1_off();
 		caught_signal = 1;
 		fclose(file);
 		break;
@@ -106,42 +53,10 @@ void *log_task(){
 
 	file = fopen(file_name, "a+");
 
-    message_t rmsg_light, rmsg_temp;
-
-	static message_t smsg_light, smsg_temp, smsg_main;
+    message_t rmsg_light, rmsg_temp, smsg_main;
 
 
     while(1) {
-
-    	gettimeofday(&smsg_light.time_stamp, NULL);
-    	smsg_light.log_level = STARTUP;
-    	smsg_light.src_id = LOG_TASK;
-    	smsg_light.dest_id = LIGHT_TASK;
-    	smsg_light.log_type = INIT;
-    	smsg_light.data = counter;
-
-    	gettimeofday(&smsg_temp.time_stamp, NULL);
-    	smsg_temp.log_level = STARTUP;
-    	smsg_temp.src_id = LOG_TASK;
-    	smsg_temp.dest_id = TEMP_TASK;
-    	smsg_temp.log_type = INIT;
-    	smsg_temp.data = counter;
-
-    	gettimeofday(&smsg_main.time_stamp, NULL);
-    	smsg_main.log_level = STARTUP;
-    	smsg_main.src_id = LOG_TASK;
-    	smsg_main.dest_id = MAIN_TASK;
-    	smsg_main.log_type = INIT;
-    	smsg_main.data = counter;
-
-        if( mq_send(log_to_light, (const char*)&smsg_light, sizeof(smsg_light), 1) == -1)
-        	printf("\nUnable to send");
-
-        if( mq_send(log_to_temp, (const char*)&smsg_temp, sizeof(smsg_temp), 1) == -1)
-        	printf("\nUnable to send");
-
-        if( mq_send(log_to_main, (const char*)&smsg_main, sizeof(smsg_main), 1) == -1)
-        	printf("\nUnable to send");
 
         if(mq_receive(temp_to_log, (char*)&rmsg_temp, \
                             sizeof(rmsg_temp), NULL)>0){
@@ -166,6 +81,18 @@ void *log_task(){
         				rmsg_temp.time_stamp.tv_sec, rmsg_temp.time_stamp.tv_usec, rmsg_temp.data);
         		fwrite(data, sizeof(char), strlen(data), file);
         	}
+
+        	if(rmsg_temp.log_type == FAILURE){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Temperature task | FAILED \n",\
+        				rmsg_temp.time_stamp.tv_sec, rmsg_temp.time_stamp.tv_usec);
+        		fwrite(data, sizeof(char), strlen(data), file);
+        	}
+        	alive = 1;
+        	if(rmsg_temp.log_type == FAILURE)
+        		alive = 0;
+
+        } else{
+        	alive = 0;
         }
 
 
@@ -193,13 +120,48 @@ void *log_task(){
         				rmsg_light.time_stamp.tv_sec, rmsg_light.time_stamp.tv_usec, rmsg_light.data);
         		fwrite(data, sizeof(char), strlen(data), file);
         	}
+
+        	if(rmsg_light.log_level == ALERT){
+        		if(rmsg_light.data == 0){
+        				sprintf(data, "Time : %ld secs, %ld usecs | Source : Light task       | It's Night\n",\
+        						rmsg_light.time_stamp.tv_sec, rmsg_light.time_stamp.tv_usec);
+        				fwrite(data, sizeof(char), strlen(data), file);
+        		}
+
+        		if(rmsg_light.data == 1){
+        				sprintf(data, "Time : %ld secs, %ld usecs | Source : Light task       | It's Day\n",\
+        						rmsg_light.time_stamp.tv_sec, rmsg_light.time_stamp.tv_usec);
+        				fwrite(data, sizeof(char), strlen(data), file);
+        		}
+        	}
+        	alive = alive + 2;
+        	if(rmsg_light.log_type == FAILURE){
+        		sprintf(data, "Time : %ld secs, %ld usecs | Source : Light task       | FAILED\n",\
+        				rmsg_light.time_stamp.tv_sec, rmsg_light.time_stamp.tv_usec);
+        		fwrite(data, sizeof(char), strlen(data), file);
+
+        	}
+
+        	if(rmsg_light.log_type == FAILURE)
+        		alive = alive -2;
+
         }
 
 
-        counter++;
-        usleep(exec_period_usecs);
-    }
+    	gettimeofday(&smsg_main.time_stamp, NULL);
+    	smsg_main.log_level = INFO;
+    	smsg_main.src_id = LOG_TASK;
+    	smsg_main.dest_id = MAIN_TASK;
+    	smsg_main.log_type = DATA;
+    	smsg_main.data = alive;
 
+        if( mq_send(log_to_main, (const char*)&smsg_main, sizeof(smsg_main), 1) == -1)
+        	printf("\nUnable to send");
+
+        usleep(exec_period_usecs);
+
+        alive = 0;
+    }
 
 }
 
@@ -221,61 +183,74 @@ void *temp_task(){
     while(1) {
 
     	if(counter_temp == 0){
-    	gettimeofday(&smsg.time_stamp, NULL);
-    	smsg.log_level = STARTUP;
-    	smsg.src_id = TEMP_TASK;
-    	smsg.dest_id = LOG_TASK;
-    	smsg.log_type = DATA;
-    	smsg.data = counter;
+    		gettimeofday(&smsg.time_stamp, NULL);
+    		smsg.log_level = INFO;
+    		smsg.src_id = TEMP_TASK;
+    		smsg.dest_id = LOG_TASK;
+    		smsg.log_type = DATA;
+    		smsg.data = counter_temp;
 
-        if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
-        	printf("\nUnable to send");
+    		if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    			printf("\nUnable to send");
 
-        counter_temp++;
+    		counter_temp++;
     	}
 
     	else if(counter_temp == 1){
-    	gettimeofday(&smsg.time_stamp, NULL);
-    	smsg.log_level = STARTUP;
-    	smsg.src_id = TEMP_TASK;
-    	smsg.dest_id = LOG_TASK;
-    	smsg.log_type = REQUEST;
-    	smsg.data = counter;
+    		gettimeofday(&smsg.time_stamp, NULL);
+    		smsg.log_level = INFO;
+    		smsg.src_id = TEMP_TASK;
+    		smsg.dest_id = LOG_TASK;
+    		smsg.log_type = REQUEST;
+    		smsg.data = counter_temp;
 
-        if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
-        	printf("\nUnable to send");
+    		if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    			printf("\nUnable to send");
 
-        counter_temp++;
+    		counter_temp++;
     	}
 
     	else if(counter_temp == 2){
-    	gettimeofday(&smsg.time_stamp, NULL);
-    	smsg.log_level = STARTUP;
-    	smsg.src_id = TEMP_TASK;
-    	smsg.dest_id = LOG_TASK;
-    	smsg.log_type = RESPONSE;
-    	smsg.data = counter;
+    		gettimeofday(&smsg.time_stamp, NULL);
+    		smsg.log_level = CRITICAL;
+    		smsg.src_id = TEMP_TASK;
+    		smsg.dest_id = LOG_TASK;
+    		smsg.log_type = DATA;
+    		smsg.data = 0;
 
-        if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
-        	printf("\nUnable to send");
+    		if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    			printf("\nUnable to send");
 
-        counter_temp = 0;
+    		counter_temp = 3;
     	}
 
-        if( mq_receive(log_to_temp, (char*)&rmsg, sizeof(rmsg), NULL) != -1)
-        	{
+    	else if(counter_temp == 3){
+    		gettimeofday(&smsg.time_stamp, NULL);
+    		smsg.log_level = CRITICAL;
+    		smsg.src_id = TEMP_TASK;
+    		smsg.dest_id = LOG_TASK;
+    		smsg.log_type = FAILURE;
+    		smsg.data = 0;
+
+    		if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    			printf("\nUnable to send");
+
+    		counter_temp = 0;
+    	}
+
+        if( mq_receive(log_to_temp, (char*)&rmsg, sizeof(rmsg), NULL) != -1){
         	gettimeofday(&smsg.time_stamp, NULL);
-        	smsg.log_level = STARTUP;
+        	smsg.log_level = INFO;
         	smsg.src_id = LIGHT_TASK;
         	smsg.dest_id = LOG_TASK;
         	smsg.log_type = RESPONSE;
         	smsg.data = 10000;
 
-            if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
-            	printf("\nUnable to send");
-        	}
+        		if( mq_send(temp_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+        			printf("\nUnable to send");
+        }
 
-        usleep(exec_period_usecs);
+        	usleep(exec_period_usecs);
     }
 
 }
@@ -290,7 +265,7 @@ void *light_task(){
 	smsg.src_id = LIGHT_TASK;
 	smsg.dest_id = LOG_TASK;
 	smsg.log_type = INIT;
-	smsg.data = counter;
+	smsg.data = 0;
 
     if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
     	printf("\nUnable to send");
@@ -299,49 +274,62 @@ void *light_task(){
     while(1) {
 
     	if(counter_light == 0){
-    	gettimeofday(&smsg.time_stamp, NULL);
-    	smsg.log_level = STARTUP;
-    	smsg.src_id = LIGHT_TASK;
-    	smsg.dest_id = LOG_TASK;
-    	smsg.log_type = DATA;
-    	smsg.data = counter;
+    		gettimeofday(&smsg.time_stamp, NULL);
+    		smsg.log_level = INFO;
+    		smsg.src_id = LIGHT_TASK;
+    		smsg.dest_id = LOG_TASK;
+    		smsg.log_type = DATA;
+    		smsg.data = counter_light;
 
-        if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
-        	printf("\nUnable to send");
+    		if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    			printf("\nUnable to send");
 
-        counter_light++;
-    	}
+    		counter_light++;
+    		}
 
     	else if(counter_light == 1){
-    	gettimeofday(&smsg.time_stamp, NULL);
-    	smsg.log_level = STARTUP;
-    	smsg.src_id = LIGHT_TASK;
-    	smsg.dest_id = LOG_TASK;
-    	smsg.log_type = REQUEST;
-    	smsg.data = counter;
+    		gettimeofday(&smsg.time_stamp, NULL);
+    		smsg.log_level = INFO;
+    		smsg.src_id = LIGHT_TASK;
+    		smsg.dest_id = LOG_TASK;
+    		smsg.log_type = REQUEST;
+    		smsg.data = counter_light;
 
-        if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
-        	printf("\nUnable to send");
+    		if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    			printf("\nUnable to send");
 
-        counter_light++;
+    		counter_light++;
     	}
 
     	else if(counter_light == 2){
-    	gettimeofday(&smsg.time_stamp, NULL);
-    	smsg.log_level = STARTUP;
-    	smsg.src_id = LIGHT_TASK;
-    	smsg.dest_id = LOG_TASK;
-    	smsg.log_type = RESPONSE;
-    	smsg.data = counter;
+    		gettimeofday(&smsg.time_stamp, NULL);
+    		smsg.log_level = CRITICAL;
+    		smsg.src_id = LIGHT_TASK;
+    		smsg.dest_id = LOG_TASK;
+    		smsg.log_type = FAILURE;
+    		smsg.data = counter_light;
 
-        if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
-        	printf("\nUnable to send");
+    		if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    			printf("\nUnable to send");
 
-        counter_light = 0;
+    		counter_light = 3;
     	}
 
-        if( mq_receive(log_to_light, (char*)&rmsg, sizeof(rmsg), NULL) != -1)
-        	{
+    	else if(counter_light == 3){
+    		gettimeofday(&smsg.time_stamp, NULL);
+    		smsg.log_level = ALERT;
+    		smsg.src_id = LIGHT_TASK;
+    		smsg.dest_id = LOG_TASK;
+    		smsg.log_type = DATA;
+    		smsg.data = 1;
+
+    		if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+    			printf("\nUnable to send");
+
+    		counter_light = 0;
+    	}
+
+        if( mq_receive(log_to_light, (char*)&rmsg, sizeof(rmsg), NULL) != -1){
         	gettimeofday(&smsg.time_stamp, NULL);
         	smsg.log_level = STARTUP;
         	smsg.src_id = LIGHT_TASK;
@@ -349,9 +337,9 @@ void *light_task(){
         	smsg.log_type = RESPONSE;
         	smsg.data = 10000;
 
-            if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
-            	printf("\nUnable to send");
-        	}
+            	if( mq_send(light_to_log, (const char*)&smsg, sizeof(smsg), 1) == -1)
+            		printf("\nUnable to send");
+        }
 
         usleep(exec_period_usecs);
     }
@@ -406,9 +394,31 @@ int main(int argc, char *argv[])
         status = mq_receive(log_to_main, (char*)&rmsg, \
                             sizeof(rmsg), NULL);
 
-        if (status > 0) {
-            printf("MSG in main_thread: %f\n", rmsg.data);
+        if (status < 0) {
+            printf("Unable to recieve\n");
         }
+
+        if(rmsg.data == 3){
+        	printf("Both tasks are alive \n");
+        	led2_off();
+        	led1_off();
+        } else if(rmsg.data == 1){
+        	printf("Light task is dead \n");
+        	led1_off();
+        	led2_on();
+        } else if(rmsg.data == 2){
+        	printf("Temp task is dead\n");
+        	led2_off();
+        	led1_on();
+        } else {
+        	printf("All tasks dead\n");
+        	led2_off();
+        	led1_off();
+        	led2_on();
+        	led1_on();
+
+        }
+
         usleep(exec_period_usecs);
     }
 
