@@ -11,6 +11,8 @@
 #include<sys/time.h>
 #include"../include/message.h"
 #include"../include/usrled.h"
+#include"../include/tmp102.h"
+#include"../include/apds9301.h"
 
 
 static void sig_handler(int signal){
@@ -384,8 +386,36 @@ int main(int argc, char *argv[])
 		printf("unable to sigaction 1");
 	}
 
+	int fd;
+	fd = sensor_init(2);
+	int status = rw_allregs_apds(fd);
+	write_interrupt_controlreg(fd, INT_ENABLE);
+	status = read_interrupt_controlreg(fd);
+	print_id(fd);
+	printf("fd light %d status: %d\n", fd, status);
+	float lumen = get_luminosity(fd);
+	printf("lumen %f", lumen);
 
-	pthread_create(&log_thread, NULL, log_task, NULL);
+	close_apds9301(fd);
+
+	 fd = tmp102_init(2);
+	  status = rw_allregs_tmp102(fd);
+	 printf("\nfd temp %d, ststus %d\n", fd, status);
+	print_temperature(fd, CONFIG_DEFAULT);
+	uint16_t *res;
+	res = malloc(sizeof(uint16_t));
+	read_configreg(fd, res);
+	printf("config_reg %d\n", *res);
+	shutdown_mode(fd, SHUTDOWN_MODE);
+	read_configreg(fd, res);
+	printf("config_reg %d\n", *res);
+	close_tmp102(fd);
+
+
+
+
+
+/*	pthread_create(&log_thread, NULL, log_task, NULL);
 	pthread_create(&temp_thread, NULL, temp_task, NULL);
 	pthread_create(&light_thread, NULL, light_task, NULL);
 
@@ -422,8 +452,10 @@ int main(int argc, char *argv[])
         usleep(exec_period_usecs);
     }
 
+
 	pthread_join(log_thread, NULL);
 	pthread_join(temp_thread, NULL);
 	pthread_join(light_thread, NULL);
+*/
 
 }
