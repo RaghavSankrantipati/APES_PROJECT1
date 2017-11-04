@@ -18,13 +18,13 @@ int tmp102_init(int bus){
 	file = open(filename, O_RDWR);
 	if (file < 0) {
 		perror("Unable to open file\n");
-		exit(-1);
+		return FAIL;
 	}
 	int addr = TMP102_ADDRESS; /* The I2C address */
 
 	if (ioctl(file, I2C_SLAVE, addr) < 0) {
 		perror("Unable to ioctl\n");
-		exit(-1);
+		return FAIL;
 	}
 	return file;
 }
@@ -92,7 +92,7 @@ int read_tempreg(int fd, uint16_t *res){
 
 	int temp = (uint16_t)buf[0]<<4 | buf[0]>>4;
 	*res = temp;
-	return SUCCESS;
+	return temp;
 }
 
 
@@ -105,7 +105,7 @@ int convert_temp(int temp, int mode){
 			float fahrenheit = (1.8 * celsius) +32;
 			float kelvin = celsius + 273.15;
 
-			printf("Temperature in \nCelsius: %f\nFahrenheit:  %f \nKelvin: %f\n", celsius, fahrenheit, kelvin);
+			printf("Temperature in Celsius: %f  Fahrenheit:  %f Kelvin: %f\n", celsius, fahrenheit, kelvin);
 			return SUCCESS;
 		} else {
 			temp = temp ^ 0xFFFF;
@@ -113,7 +113,7 @@ int convert_temp(int temp, int mode){
 			float fahrenheit = (1.8 * celsius) +32;
 			float kelvin = celsius + 273.15;
 
-			printf("Temperature in \nCelsius: %f\nFahrenheit:  %f \nKelvin: %f\n", celsius, fahrenheit, kelvin);
+			printf("Temperature in Celsius: %f  Fahrenheit:  %f Kelvin: %f\n", celsius, fahrenheit, kelvin);
 			return SUCCESS;
 		}
 	} else if(mode == CONFIG_DEFAULT){
@@ -122,7 +122,7 @@ int convert_temp(int temp, int mode){
 			float fahrenheit = (1.8 * celsius) +32;
 			float kelvin = celsius + 273.15;
 
-			printf("Temperature in \nCelsius: %f\nFahrenheit:  %f \nKelvin: %f\n", celsius, fahrenheit, kelvin);
+			printf("Temperature in Celsius: %f  Fahrenheit:  %f Kelvin: %f\n", celsius, fahrenheit, kelvin);
 			return SUCCESS;
 		} else {
 			temp = temp ^ 0xFFFF;
@@ -130,11 +130,26 @@ int convert_temp(int temp, int mode){
 			float fahrenheit = (1.8 * celsius) +32;
 			float kelvin = celsius + 273.15;
 
-			printf("Temperature in \nCelsius: %f\nFahrenheit:  %f \nKelvin: %f\n", celsius, fahrenheit, kelvin);
+			printf("Temperature in Celsius: %f  Fahrenheit:  %f Kelvin: %f\n", celsius, fahrenheit, kelvin);
 			return SUCCESS;
 		}
 	}
 	return FAIL;
+}
+
+float callibrate_temp(int temp, uint8_t mode){
+
+	float celsius = temp * 0.0625;
+
+	if(mode == CELSIUS)
+		return celsius;
+	else if(mode == FAHRENHEIT)
+		return (1.8 * celsius) + 32;
+	else if(mode == KELVIN)
+		return celsius + 273.15;
+
+	return FAIL;
+
 }
 
 int shutdown_mode(int fd, int mode){
@@ -151,7 +166,7 @@ int print_temperature(int fd, int mode){
 
 	read_tempreg(fd, temp);
 	convert_temp(*temp, mode);
-	return SUCCESS;
+	return *temp;
 }
 
 int close_tmp102(int fd){

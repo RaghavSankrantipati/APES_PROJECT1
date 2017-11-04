@@ -10,6 +10,7 @@
 
 #include<stdint.h>
 
+#define CHECK_LIBRARY  	0x00
 
 #define TMP102_ADDRESS	0x48
 
@@ -27,6 +28,10 @@
 #define ONESHOT_MODE	0x0080
 #define	EXTND_MODE		0x1000
 
+#define CELSIUS			0x00
+#define FAHRENHEIT		0x01
+#define	KELVIN			0x02
+
 enum{
 	SUCCESS = 0,
 	FAIL = -1
@@ -43,6 +48,7 @@ int change_resolution(int fd, int mode);
 int print_temperature(int fd, int mode);
 int close_tmp102(int fd);
 int rw_allregs_tmp102(int fd);
+float callibrate_temp(int temp, uint8_t mode);
 
 
 

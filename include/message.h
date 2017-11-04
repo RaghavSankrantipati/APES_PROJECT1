@@ -34,6 +34,7 @@ typedef enum{
 	HEART_BEAT
 }log_type_t;
 
+
 typedef struct {
 	struct timeval time_stamp;
 	log_level_t log_level;
@@ -47,24 +48,40 @@ typedef struct {
 #define	LIGHT_TO_LOG	"/lighttolog"
 #define LOG_TO_LIGHT	"/logtolight"
 #define	LOG_TO_TEMP		"/logtotemp"
-#define	LOG_TO_MAIN		"/logtomain"
+#define	MAIN_TO_LOG		"/maintolog"
+#define TEMP_TO_MAIN	"/temptomain"
+#define LIGHT_TO_MAIN	"/lighttomain"
 
 
 pthread_t log_thread, temp_thread, light_thread;
 
-mqd_t temp_to_log, light_to_log, log_to_light, log_to_temp, log_to_main;
+mqd_t temp_to_log, light_to_log, log_to_light, log_to_temp, main_to_log,\
+		temp_to_main, light_to_main;
 
 int status = 0;
 
 char data[500];
 
+#define LIGHT_TASK	0x01
+#define TEMP_TASK	0x02
+
 int exec_period_usecs = 1000000; /*in micro-seconds*/
 int caught_signal = 0;
-int counter_temp = 0;
-int counter_light = 0;
-int alive = 0;
-
+int counter_temp = 1;
+int counter_light = 1;
+int temp_failure = 0;
+int temp_degree = 0;
+int light_failure = 0;
+float prev_lumen = 0;
+int day = 0, night = 0;
+int fd;
+int c = 0, k = 0, f = 0;
+int temp_alive = 0, light_alive = 0;
 
 struct	mq_attr	attr;
+pthread_mutex_t mutex;
+
+void close_queues(void);
+void open_queues(void);
 
 #endif /* MESSAGE_H_ */
