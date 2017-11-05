@@ -1,12 +1,14 @@
-/*
- ============================================================================
- Name        : project.c
- Author      : Sai Raghavendra Sankrantipati
- Version     :
- Copyright   : Your copyright notice
- Description : Hello World in C, Ansi-style
- ============================================================================
- */
+
+/**********************************************************************
+*@Filename:tmp102.c
+*
+*@Description:This is a library for APDS 9301 sensor
+*@Author:Sai Raghavendra Sankrantipati
+*@Date:11/5/2017
+*@compiler:arm-linux-gnueabihf-gcc
+*@Usage : Connect APDS 9301 to I2C 2 and use any of the library function to read and write registers
+ **********************************************************************/
+
 
 #include<stdio.h>
 #include<unistd.h>
@@ -20,6 +22,11 @@
 
 #include"../include/apds9301.h"
 #include"../include/tmp102.h"
+
+
+/* Initialise sensor on I2C bus 2
+ * Pass 2 for I2C bus 2 and  1 for I2C bus 1
+ * */
 
 int sensor_init(int bus){
 	int file;
@@ -40,6 +47,9 @@ int sensor_init(int bus){
 	return file;
 }
 
+/* Read write all registers
+ * Use it for debug
+ */
 int rw_allregs_apds(int fd){
 
 	int status;
@@ -55,6 +65,8 @@ int rw_allregs_apds(int fd){
 	status = read_timingreg(fd);
 	if( status ==  FAIL )
 		return FAIL;
+	/*Interrupt threshhold register reads 4 bytes*/
+
 	uint8_t arr[4] = {0, 0, 0, 0};
 
 	status = read_interrupt_threshholdreg(fd, arr);
@@ -77,6 +89,8 @@ int rw_allregs_apds(int fd){
 
 }
 
+
+/*Write to control register*/
 int write_controlreg(int fd, uint8_t val){
 
 	int buf = command_value | control_reg ;
@@ -92,7 +106,9 @@ int write_controlreg(int fd, uint8_t val){
 	return 0;
 }
 
-
+/* read from control register and returns read value
+ * In case of error returns Failure
+ */
 uint8_t read_controlreg(int fd){
 	uint8_t buf =  command_value | control_reg ;
 	if( write(fd, &buf, 1) != 1){
@@ -107,7 +123,9 @@ uint8_t read_controlreg(int fd){
 	return buf;
 }
 
-
+/*Write to timing register
+ * params file descriptor and value to be written
+ */
 int write_timingreg(int fd, uint8_t val){
 
 	int buf = command_value | timing_reg ;
@@ -124,6 +142,9 @@ int write_timingreg(int fd, uint8_t val){
 
 }
 
+/* Reads from timing register
+ * return read value and return Fail
+ */
 
 uint8_t read_timingreg(int fd){
 	uint8_t buf =  command_value | timing_reg ;
@@ -139,6 +160,7 @@ uint8_t read_timingreg(int fd){
 	return buf;
 }
 
+/* Write 4 bytes to interrupt threshhold register*/
 int write_interrupt_thresholdreg(int fd, uint8_t *write_array){
 
 	int buf = command_value | threshlowlow_reg ;
@@ -187,6 +209,9 @@ int write_interrupt_thresholdreg(int fd, uint8_t *write_array){
 
 }
 
+/*Read value from interrupt_threshhold register
+ * Returns either read value and fail on failure
+ */
 int read_interrupt_threshholdreg(int fd, uint8_t * read_array){
 
 	uint8_t buf =  command_value | threshlowlow_reg ;
@@ -236,6 +261,7 @@ int read_interrupt_threshholdreg(int fd, uint8_t * read_array){
 
 }
 
+/*Wirte to interrupt control register*/
 int write_interrupt_controlreg(int fd, uint8_t val){
 	uint8_t buf = command_value | int_control_reg ;
     if( write(fd, &buf, 1) != 1){
@@ -250,7 +276,7 @@ int write_interrupt_controlreg(int fd, uint8_t val){
 	return SUCCESS;
 }
 
-
+/*read from interrupt control register */
 uint8_t read_interrupt_controlreg(int fd){
 	uint8_t buf =  command_value | int_control_reg ;
 	if( write(fd, &buf, 1) != 1){
@@ -265,6 +291,7 @@ uint8_t read_interrupt_controlreg(int fd){
 	return buf;
 }
 
+/* Read id register*/
 uint8_t read_idreg(int fd){
 	uint8_t buf =  command_value | id_reg ;
 	if( write(fd, &buf, 1) != 1){
@@ -279,13 +306,17 @@ uint8_t read_idreg(int fd){
 	return buf;
 }
 
-void print_id(int fd){
+/*Print sensor id and version*/
+int print_id(int fd){
 	uint8_t id2, id1 = read_idreg(fd);
 	id2 = id1;
+	printf("Printing id register\n");
 	printf("Part no: %d\n", (id1>>4 & 0xFF));
 	printf("Rev no: %d\n", (id2 & 0x0F));
+	return SUCCESS;
 }
 
+/* Read adc0 register of light*/
 uint16_t read_data0reg(int fd){
 	uint8_t buf =  command_value |  data0low_reg;
 	if( write(fd, &buf, 1) != 1){
@@ -315,7 +346,7 @@ uint16_t read_data0reg(int fd){
 	return data0;
 }
 
-
+/*Read adc1 register of light*/
 uint16_t read_data1reg(int fd){
 	uint8_t buf =  command_value |  data1low_reg;
 	if( write(fd, &buf, 1) != 1){
@@ -343,7 +374,7 @@ uint16_t read_data1reg(int fd){
 	return data1;
 }
 
-
+/*get calibrated luminosity */
 float get_luminosity(int fd){
 	float ch0, ch1, adc, luminosity;
 
@@ -356,6 +387,7 @@ float get_luminosity(int fd){
 
 	adc = ch1/ch0;
 
+	/* According to data sheet*/
 	if(adc>0 && adc <= 0.5)
 		return luminosity = (0.0304 * ch0) - (0.062 * ch0 * powf(adc, 1.4));
 	else if(adc>0.5 && adc<=0.61)
@@ -370,6 +402,7 @@ float get_luminosity(int fd){
 	return FAIL;
 }
 
+/*close file descriptor*/
 int close_apds9301(int fd){
 	close(fd);
 	return SUCCESS;

@@ -6,21 +6,18 @@
 C_SRCS += \
 ../src/apds9301.c \
 ../src/main.c \
-../src/message.c \
 ../src/tmp102.c \
 ../src/usrled.c 
 
 OBJS += \
 ./src/apds9301.o \
 ./src/main.o \
-./src/message.o \
 ./src/tmp102.o \
 ./src/usrled.o 
 
 C_DEPS += \
 ./src/apds9301.d \
 ./src/main.d \
-./src/message.d \
 ./src/tmp102.d \
 ./src/usrled.d 
 

@@ -1,4 +1,3 @@
-
 #include<stdio.h>
 #include<unistd.h>
 #include<stdlib.h>
@@ -10,6 +9,18 @@
 #include<complex.h>
 #include"../include/tmp102.h"
 
+
+/**********************************************************************
+*@Filename:tmp102.c
+*
+*@Description:This is a library for TMP102 sensor
+*@Author:Sai Raghavendra Sankrantipati
+*@Date:11/5/2017
+*@compiler:arm-linux-gnueabihf-gcc
+*@Usage : Connect TMP102 to I2C 2 and use any of the library function to read and write registers
+ **********************************************************************/
+
+/*Initialse sensor by opening dev/i2c-2*/
 int tmp102_init(int bus){
 	int file;
 	char filename[20];
@@ -29,6 +40,8 @@ int tmp102_init(int bus){
 	return file;
 }
 
+
+/* A function that calls all the registers and does reads and writes*/
 int rw_allregs_tmp102(int fd){
 	int status;
 	uint16_t *res;
@@ -45,6 +58,10 @@ int rw_allregs_tmp102(int fd){
 	return SUCCESS;
 }
 
+/*Write to pointer register
+ * An call to registers are made
+ * only through pointer register
+ */
 int write_pointerreg(int fd, uint8_t reg){
 	uint8_t buf = POINTER_ADDRESS | reg;
 	if( write(fd, &buf, 1) != 1){
@@ -54,6 +71,16 @@ int write_pointerreg(int fd, uint8_t reg){
 	return SUCCESS;
 
 }
+
+/*Write to Config register
+ *  Pass CONFIG_DEFAULT for default configuration and
+ *  SHUTDOWN_MODE	0x0001
+ *	THERMOSTAT_MODE	0x0002
+ * 	POLARITY		0x0004
+ * 	ONESHOT_MODE	0x0080
+ *	EXTND_MODE		0x1000
+ *	for different mode options
+ */
 
 int write_configreg(int fd, uint16_t config_val){
 	write_pointerreg(fd, CONFREG_ADDRESS);
@@ -70,7 +97,9 @@ int write_configreg(int fd, uint16_t config_val){
 	return SUCCESS;
 }
 
-int read_configreg(int fd, uint16_t * res){
+
+/* Read config register. Use it for debugging*/
+int read_configreg(int fd, uint16_t *res){
 
 	write_pointerreg(fd, CONFREG_ADDRESS);
 	uint16_t buf;
@@ -82,6 +111,7 @@ int read_configreg(int fd, uint16_t * res){
 	return SUCCESS;
 }
 
+/*This function fetches the 12/13 bit temperature from tmp102*/
 int read_tempreg(int fd, uint16_t *res){
 	write_pointerreg(fd, TEMPREG_ADDRESS);
 	uint8_t buf[2];
@@ -96,6 +126,11 @@ int read_tempreg(int fd, uint16_t *res){
 }
 
 
+/* This converts temperature in different types and prints on consle
+ * Pass 12/13bit adc register value and mode (12 or 13 bit mode)
+ * 0.0625 is the resoluion of sensor. So multiply it to get celsius and
+ * convert accordingly
+ */
 int convert_temp(int temp, int mode){
 
 	if(mode == EXTND_MODE){
@@ -137,6 +172,10 @@ int convert_temp(int temp, int mode){
 	return FAIL;
 }
 
+/*This calibrates temperature and returns in mode it's asked
+ * Mode can be celsius or fahrenheit or kelvin
+ * It returns a float
+ */
 float callibrate_temp(int temp, uint8_t mode){
 
 	float celsius = temp * 0.0625;
@@ -152,6 +191,7 @@ float callibrate_temp(int temp, uint8_t mode){
 
 }
 
+/* This puts sensor in shutdown mode*/
 int shutdown_mode(int fd, int mode){
 	return write_configreg(fd, mode);
 }
@@ -160,8 +200,10 @@ int change_resolution(int fd, int mode){
 	return write_configreg(fd, mode);
 }
 
+/*It prints temperature*/
 int print_temperature(int fd, int mode){
-	write_configreg(fd, mode);
+	if( write_configreg(fd, mode) == FAIL)
+		return FAIL;
 	uint16_t *temp = malloc(sizeof(uint16_t));
 
 	read_tempreg(fd, temp);
@@ -169,6 +211,7 @@ int print_temperature(int fd, int mode){
 	return *temp;
 }
 
+/*Closes file descriptor opened in sensor_init*/
 int close_tmp102(int fd){
 	close(fd);
 	return 1;
