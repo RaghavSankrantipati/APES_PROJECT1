@@ -82,7 +82,7 @@ char data[500];
 
 /*condition variables*/
 int c = 0, k = 0, f = 0;
-int temp_alive = 0, light_alive = 0;
+int temp_alive = 0, light_alive = 0, log_alive = 0;
 int caught_signal = 0;
 
 int exec_period_usecs = 1000000; /*in micro-seconds*/
@@ -93,6 +93,7 @@ int temp_degree = 0;
 int light_failure = 0;
 float prev_lumen = 0;
 int day = 0, night = 0;
+int temp_life = 0, light_life = 0;
 int fd;
 
 
@@ -100,7 +101,15 @@ int fd;
 struct	mq_attr	attr;
 pthread_mutex_t mutex;
 
-void close_queues(void);
+int close_queues(void);
 void open_queues(void);
+int send_noHB_temp(void);
+int send_noHB_light(void);
+int log_tempqueue();
+int log_lightqueue(void);
+int log_mainqueue(void);
+int send_init_temp();
+int send_int_light();
+int log_init();
 
 #endif /* MESSAGE_H_ */
