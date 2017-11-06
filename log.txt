@@ -1,0 +1,24 @@
+Time : 1509948966 secs, 831756 usecs | Source : Log task | Log task initialised
+Time : 1509948966 secs, 826242 usecs | Source : Temperature task | Task Initialized
+Time : 1509948966 secs, 826273 usecs | Source : Temperature task | Request Light
+Time : 1509948966 secs, 823130 usecs | Source : Light task       | Task Initialized
+Time : 1509948966 secs, 846530 usecs | Source : Temperature task | TEMPERATURE : 24.062500F 
+Time : 1509948966 secs, 840906 usecs | Source : Light task       | It's Day
+Time : 1509948968 secs, 870692 usecs | Source : Temperature task | TEMPERATURE : 297.212494K 
+Time : 1509948967 secs, 852510 usecs | Source : Light task       | Lumen : 4.664300 | Response to temp task 
+Time : 1509948969 secs, 882353 usecs | Source : Temperature task | TEMPERATURE : 24.062500C 
+Time : 1509948968 secs, 865611 usecs | Source : Light task 	 | Lumen : 4.643700
+Time : 1509948969 secs, 877202 usecs | Source : Light task 	 | Lumen : 4.664300
+Time : 1509948970 secs, 894161 usecs | Source : Temperature task | TEMPERATURE : 75.312500F 
+Time : 1509948970 secs, 888923 usecs | Source : Light task 	 | Lumen : 4.664300
+Time : 1509948971 secs, 905644 usecs | Source : Temperature task | TEMPERATURE : 297.212494K 
+Time : 1509948971 secs, 900433 usecs | Source : Light task 	 | Lumen : 4.664300
+Time : 1509948972 secs, 917448 usecs | Source : Temperature task | Request Light
+Time : 1509948972 secs, 911978 usecs | Source : Light task 	 | Lumen : 4.654000
+Time : 1509948974 secs, 573573 usecs | Source : MAIN task | No TEMP Heart beat
+Time : 1509948974 secs, 573573 usecs | Source : MAIN task | Terminating Temperature task
+Time : 1509948973 secs, 930293 usecs | Source : Temperature task | TEMPERATURE : 75.312500F 
+Time : 1509948973 secs, 923693 usecs | Source : Light task       | Lumen : 4.641200 | Response to temp task 
+Time : 1509948974 secs, 574701 usecs | Source : MAIN task | No LIGHT task Heart beat
+Time : 1509948974 secs, 574701 usecs | Source : MAIN task | Terminating Light task
+Time : 1509948974 secs, 936817 usecs | Source : Light task 	 | Lumen : 4.641200
