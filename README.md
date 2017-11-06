@@ -1,4 +1,4 @@
-#APES_PROJECT1
+# APES_PROJECT1
 Project 1 repository for APES ECEN 5013
 A project based on linux i2c drivers and posix messsage queues. A concurrent software application on Linux that will interact with both Userspace and kernel space in addition to multiple connected I2C devices. Two different tasks were created with these two interfaces to collect data, another task to log system status information and the main task to create these tasks and error checkings.
 
